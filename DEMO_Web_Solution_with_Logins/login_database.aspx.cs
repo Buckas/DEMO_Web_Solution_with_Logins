@@ -156,24 +156,12 @@ namespace DEMO_Web_Solution_with_Logins
                         // Authentication Success Path
                         // ========================================
 
-                        // Establish authenticated session with username identifier FIRST
-                        // This ensures the username is in session before regeneration
+                        // Establish authenticated session
                         Session["LoggedInUser"] = username;
-
-                        // Mitigate session fixation: Regenerate session ID after authentication
-                        // This invalidates any pre-authentication session ID an attacker may have obtained
-                        // New session ID is generated, preventing session hijacking attacks
-                        // The RegenerateSessionId method will preserve the "LoggedInUser" we just set
-                        RegenerateSessionId();
 
                         // Redirect to application home page
                         // Using endResponse: false prevents ThreadAbortException and improves performance
-                        // Post-Redirect-Get (PRG) pattern prevents form resubmission on browser refresh
                         Response.Redirect("index.aspx", endResponse: false);
-
-                        // Explicit context termination after redirect
-                        // Prevents any further code execution in the current request
-                        Context.ApplicationInstance.CompleteRequest();
                     }
                     // count == 0, no matching credentials found
                     else

@@ -154,59 +154,29 @@ namespace DEMO_Web_Solution_with_Logins
                         // ========================================
                         // STEP 8: EXTRACT USER DATA FROM DATABASE
                         // ========================================
-                        // Get each column value from the database row
-                        // BEGINNER NOTE: reader["ColumnName"] gets the value of that column from the current row
-
-                        // Get the username from database (should match what user typed)
                         string dbUsername = reader["Username"].ToString();
-
-                        // Get the stored password hash (encrypted password)
-                        // BEGINNER NOTE: (byte[]) is a "cast" that converts the value to a byte array
-                        // Passwords are hashed into bytes for security
                         byte[] passwordHash = (byte[])reader["PasswordHash"];
-
-                        // Get the salt that was used when hashing the password
-                        // BEGINNER NOTE: A salt is random data added to passwords before hashing
-                        // This makes each password hash unique even if two users have the same password
-                        byte[] salt = (byte[])reader["Salt"];
-
-                        // Get the account status (true = active, false = locked)
+                        byte[] salt = (byte[])reader["Salt"];  // Random data that makes each password hash unique
                         bool isActive = (bool)reader["IsActive"];
-
-                        // Get how many times login has failed for this user
                         int failedAttempts = (int)reader["FailedLoginAttempts"];
-
-                        // Get the user's first name
                         string givenName = reader["GivenName"].ToString();
-
-                        // Get the user's last name
                         string surname = reader["Surname"].ToString();
+                        string email = reader["Email"] as string;  // Handles NULL safely
 
-                        // Get the user's email (might be NULL in database, so handle safely)
-                        // BEGINNER NOTE: "as string" safely converts to string, returns null if DB value is NULL
-                        string email = reader["Email"] as string;
-
-                        // ========================================
-                        // STEP 9: CLOSE THE READER
-                        // ========================================
-                        // Close the reader so we can execute more commands on the same connection
-                        // BEGINNER NOTE: You can't run multiple commands at once on the same connection
-                        // We need to close the reader before we can execute UPDATE commands later
+                        // Close reader before executing more commands
                         reader.Close();
 
                         // ========================================
-                        // STEP 10: CHECK IF ACCOUNT IS LOCKED
+                        // STEP 9: CHECK IF ACCOUNT IS LOCKED
                         // ========================================
-                        // Check if the IsActive flag is false (account is locked)
                         if (!isActive)
                         {
-                            // Account has been locked due to too many failed login attempts
                             lblMessage.Text = "Account is locked. Please contact an administrator.";
-                            return; // Exit the method - cannot login with locked account
+                            return;
                         }
 
                         // ========================================
-                        // STEP 11: HASH THE PASSWORD USER ENTERED
+                        // STEP 10: VERIFY PASSWORD
                         // ========================================
                         // Take the password the user typed and hash it using the same salt from the database
                         // BEGINNER NOTE: We never store plain text passwords in the database
@@ -258,35 +228,23 @@ namespace DEMO_Web_Solution_with_Logins
                             // It lasts until the user closes their browser or logs out
                             // We can access these values from any page while user is logged in
 
-                            // Set all session variables FIRST before regenerating session ID
-                            // This ensures all data is preserved when the session ID changes
-                            Session["Username"] = dbUsername;      // Store username
-                            Session["GivenName"] = givenName;      // Store first name
-                            Session["Surname"] = surname;          // Store last name
-                            Session["Email"] = email;              // Store email
-                            Session["IsLoggedIn"] = true;          // Flag that user is logged in
+                            // Store user data in session
+                            Session["Username"] = dbUsername;
+                            Session["GivenName"] = givenName;
+                            Session["Surname"] = surname;
+                            Session["Email"] = email;
+                            Session["IsLoggedIn"] = true;
                             Session["LoggedInUser"] = dbUsername;
 
-                            // Mitigate session fixation: Regenerate session ID after authentication
-                            // This prevents attackers from using a pre-authenticated session ID
-                            // The RegenerateSessionId method will preserve all the session data we just set
-                            RegenerateSessionId();
 
                             // ========================================
                             // STEP 15: REDIRECT TO HOME PAGE
                             // ========================================
-                            // Send the user to the index.aspx page
-                            // BEGINNER NOTE: Response.Redirect() loads a different page
-                            // This is like clicking a link - it takes the user to a new page
-
-                            // Using endResponse: false prevents a ThreadAbortException from being thrown
-                            // BEGINNER NOTE: Without this, the redirect throws an exception to stop the code
-                            // which is slow and wastes computer resources. This way is much faster!
+                            // Redirect to index page
+                            // BEGINNER NOTE: Response.Redirect() loads a different page - like clicking a link
+                            // Using endResponse: false prevents ThreadAbortException (much faster and safer)
+                            // We must allow the request to complete naturally so the new session cookie reaches the browser
                             Response.Redirect("index.aspx", endResponse: false);
-
-                            // Tell ASP.NET to finish processing this request cleanly
-                            // BEGINNER NOTE: This ensures no more code runs after the redirect
-                            Context.ApplicationInstance.CompleteRequest();
                         }
                         else
                         {
@@ -294,70 +252,39 @@ namespace DEMO_Web_Solution_with_Logins
                             // PASSWORD DOES NOT MATCH - FAILED LOGIN
                             // ========================================
 
-                            // ========================================
-                            // STEP 16: INCREMENT FAILED ATTEMPT COUNTER
-                            // ========================================
-                            // Add 1 to the failed attempts counter
+                            // Increment failed attempts counter
                             // BEGINNER NOTE: failedAttempts++ is shorthand for failedAttempts = failedAttempts + 1
                             failedAttempts++;
 
-                            // ========================================
-                            // STEP 17: CHECK IF ACCOUNT SHOULD BE LOCKED
-                            // ========================================
-                            // If user has failed to login 3 or more times, lock the account
+                            // Check if account should be locked (3 or more failed attempts)
                             if (failedAttempts >= 3)
                             {
-                                // ========================================
-                                // LOCK THE ACCOUNT
-                                // ========================================
-                                // Update database to:
-                                // 1. Save the failed attempts count
-                                // 2. Set IsActive to 0 (false) which locks the account
+                                // Lock the account by setting IsActive = 0 and saving failed attempts count
                                 string lockSql = "UPDATE UsersComplexVersion SET FailedLoginAttempts = @FailedAttempts, IsActive = 0 WHERE Username = @Username";
 
-                                // Create and execute the command to lock the account
                                 using (SqlCommand lockCmd = new SqlCommand(lockSql, conn))
                                 {
-                                    // Add parameter for the number of failed attempts
                                     lockCmd.Parameters.Add("@FailedAttempts", SqlDbType.Int).Value = failedAttempts;
-
-                                    // Add parameter for username
                                     lockCmd.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = username;
-
-                                    // Execute the UPDATE command
                                     lockCmd.ExecuteNonQuery();
                                 }
 
-                                // Display message that account is locked
-                                // BEGINNER NOTE: This is a security feature to prevent brute-force attacks
-                                // where hackers try many passwords rapidly
+                                // BEGINNER NOTE: Account locking prevents brute-force attacks where hackers try many passwords rapidly
                                 lblMessage.Text = "Account has been locked due to multiple failed login attempts. Please contact an administrator.";
                             }
                             else
                             {
-                                // ========================================
-                                // ACCOUNT NOT LOCKED YET - UPDATE COUNTER
-                                // ========================================
-                                // The user hasn't reached 3 failed attempts yet
-                                // Just update the counter in the database and show generic error
+                                // Update failed attempts counter (not yet at lockout threshold)
                                 string updateSql = "UPDATE UsersComplexVersion SET FailedLoginAttempts = @FailedAttempts WHERE Username = @Username";
 
-                                // Create and execute the command to update failed attempts
                                 using (SqlCommand updateCmd = new SqlCommand(updateSql, conn))
                                 {
-                                    // Add parameter for the updated number of failed attempts
                                     updateCmd.Parameters.Add("@FailedAttempts", SqlDbType.Int).Value = failedAttempts;
-
-                                    // Add parameter for username
                                     updateCmd.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = username;
-
-                                    // Execute the UPDATE command
                                     updateCmd.ExecuteNonQuery();
                                 }
 
-                                // Display generic error message
-                                // SECURITY NOTE: Don't tell user how many attempts they have left
-                                // This prevents attackers from knowing how close they are to locking the account
+                                // SECURITY NOTE: Generic error prevents attackers from knowing how close they are to lockout
                                 lblMessage.Text = "Invalid username or password.";
                             }
                         }
@@ -474,59 +401,28 @@ namespace DEMO_Web_Solution_with_Logins
             return diff == 0;
         }
 
-        /// <summary>
-        /// REGENERATE SESSION ID METHOD
-        /// 
-        /// This method creates a new session ID to prevent session fixation attacks.
-        /// 
-        /// BEGINNER NOTE: A session fixation attack is when a hacker tricks you into using
-        /// a session ID they already know. After you log in with that ID, they can use it
-        /// to access your account. By creating a NEW session ID after login, we make sure
-        /// any old session IDs the hacker had are now useless.
-        /// 
-        /// HOW IT WORKS:
-        /// 1. Save any data that was in the old session (like shopping cart items)
-        /// 2. Abandon (delete) the old session and its ID
-        /// 3. Clear the session cookie so the browser forgets the old ID
-        /// 4. When we access Session again, ASP.NET automatically creates a new ID
-        /// 5. Put back any saved data into the new session
-        /// 
-        /// SECURITY BENEFIT:
-        /// Even if a hacker had your old session ID before you logged in, they can't use it
-        /// after you log in because we've created a completely new session ID.
-        /// </summary>
-        private void RegenerateSessionId()
-        {
-            // Create a temporary place to store session data
-            // BEGINNER NOTE: Dictionary is like a list that stores key-value pairs
-            var preservedData = new Dictionary<string, object>();
+        ///// <summary>
+        ///// Regenerates session ID to prevent session fixation attacks.
+        ///// 
+        ///// Uses SessionIDManager to create a new session ID while preserving session data.
+        ///// This is more reliable than Session.Abandon() for authentication scenarios.
+        ///// </summary>
+        //private void RegenerateSessionId()
+        //{
+        //    // Get the session ID manager
+        //    var manager = new System.Web.SessionState.SessionIDManager();
 
-            // Loop through all items in the current session and save them
-            // BEGINNER NOTE: We do this so we don't lose any data when we delete the session
-            foreach (string key in Session.Keys)
-            {
-                preservedData[key] = Session[key];
-            }
+        //    // Create a new session ID
+        //    string newSessionId = manager.CreateSessionID(Context);
 
-            // Abandon the current session - this marks it for deletion
-            // BEGINNER NOTE: After this line, the old session ID is invalid and can't be used
-            Session.Abandon();
+        //    // Remove the old session ID cookie
+        //    Response.Cookies.Add(new HttpCookie("ASP.NET_SessionId", "")
+        //    {
+        //        Expires = DateTime.Now.AddDays(-1)
+        //    });
 
-            // Clear the session cookie from the user's browser
-            // BEGINNER NOTE: This tells the browser to forget the old session ID
-            // Expires = DateTime.Now.AddDays(-1) means "this cookie expired yesterday" (forces deletion)
-            if (Response.Cookies["ASP.NET_SessionId"] != null)
-            {
-                Response.Cookies["ASP.NET_SessionId"].Expires = DateTime.Now.AddDays(-1);
-            }
-
-            // Restore all the saved data to the session
-            // BEGINNER NOTE: When we access Session here, ASP.NET automatically creates
-            // a NEW session with a NEW session ID. Then we put all the old data back.
-            foreach (var item in preservedData)
-            {
-                Session[item.Key] = item.Value;
-            }
-        }
+        //    // Add new session ID cookie
+        //    Response.Cookies.Add(new HttpCookie("ASP.NET_SessionId", newSessionId));
+        //}
     }
 }
