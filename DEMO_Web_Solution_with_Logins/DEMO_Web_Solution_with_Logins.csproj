@@ -67,14 +67,18 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="App_Data\SolutionDataBase.mdf" />
+    <Content Include="App_Data\SolutionDataBase.mdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="App_Data\SolutionDataBase_log.ldf">
       <DependentUpon>SolutionDataBase.mdf</DependentUpon>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="CodePageLoginDatabase.aspx" />
     <Content Include="index.aspx" />
     <Content Include="login_basic.aspx" />
     <Content Include="login_database.aspx" />
+    <Content Include="login_database_complex.aspx" />
     <Content Include="manageUsers.aspx" />
     <Content Include="Web.config" />
   </ItemGroup>
@@ -106,6 +110,13 @@
     </Compile>
     <Compile Include="login_database.aspx.designer.cs">
       <DependentUpon>login_database.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="login_database_complex.aspx.cs">
+      <DependentUpon>login_database_complex.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="login_database_complex.aspx.designer.cs">
+      <DependentUpon>login_database_complex.aspx</DependentUpon>
     </Compile>
     <Compile Include="manageUsers.aspx.cs">
       <DependentUpon>manageUsers.aspx</DependentUpon>

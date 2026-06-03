@@ -89,7 +89,97 @@ namespace DEMO_Web_Solution_with_Logins
 
         protected void btnComplexAddUser_Click(object sender, EventArgs e)
         {
+            bool success = InsertUser(
+                    txtGivenName.Text,
+                    txtSurname.Text,
+                    txtUsername.Text,
+                    txtPassword.Text,
+                    txtEmail.Text,
+                    true);
 
+            if (success)
+            {
+                lblMessage.Text = "User created successfully";
+            }
+            else
+            {
+                lblMessage.Text = "Username already exists";
+            }
+
+        }
+
+        public bool InsertUser(
+    string givenName,
+    string surname,
+    string username,
+    string plainTextPassword,
+    string email,
+    bool isActive)
+        {
+            string connectionString = "Data Source=(LocalDB)\\MSSQLLocalDB;AttachDbFilename=|DataDirectory|\\SolutionDataBase.mdf;Integrated Security=True";
+
+            // ✅ Step 1: Generate salt
+            byte[] salt = new byte[32];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(salt);
+            }
+
+            // ✅ Step 2: Generate password hash (64 bytes)
+            byte[] passwordHash;
+            using (var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes(
+                plainTextPassword,
+                salt,
+                100000,
+                System.Security.Cryptography.HashAlgorithmName.SHA256))
+            {
+                passwordHash = pbkdf2.GetBytes(64);
+            }
+
+            string sql = @"
+        INSERT INTO UsersComplexVersion
+        (GivenName, Surname, Username, PasswordHash, Salt, Email, IsActive, FailedLoginAttempts)
+        VALUES
+        (@GivenName, @Surname, @Username, @PasswordHash, @Salt, @Email, @IsActive, @FailedLoginAttempts)";
+
+            using (System.Data.SqlClient.SqlConnection conn = new System.Data.SqlClient.SqlConnection(connectionString))
+            using (System.Data.SqlClient.SqlCommand cmd = new System.Data.SqlClient.SqlCommand(sql, conn))
+            {
+                // ✅ Parameters
+                cmd.Parameters.Add("@GivenName", System.Data.SqlDbType.NVarChar, 100).Value = givenName;
+                cmd.Parameters.Add("@Surname", System.Data.SqlDbType.NVarChar, 100).Value = surname;
+                cmd.Parameters.Add("@Username", System.Data.SqlDbType.NVarChar, 100).Value = username;
+
+                cmd.Parameters.Add("@PasswordHash", System.Data.SqlDbType.VarBinary, 64).Value = passwordHash;
+                cmd.Parameters.Add("@Salt", System.Data.SqlDbType.VarBinary, 32).Value = salt;
+
+                if (string.IsNullOrWhiteSpace(email))
+                    cmd.Parameters.Add("@Email", System.Data.SqlDbType.NVarChar, 255).Value = DBNull.Value;
+                else
+                    cmd.Parameters.Add("@Email", System.Data.SqlDbType.NVarChar, 255).Value = email;
+
+                cmd.Parameters.Add("@IsActive", System.Data.SqlDbType.Bit).Value = isActive;
+                cmd.Parameters.Add("@FailedLoginAttempts", System.Data.SqlDbType.Int).Value = 0;
+
+                try
+                {
+                    conn.Open();
+                    int rowsAffected = cmd.ExecuteNonQuery();
+
+                    return rowsAffected == 1;
+                }
+                catch (System.Data.SqlClient.SqlException ex)
+                {
+                    // ✅ Handle duplicate username (UNIQUE constraint)
+                    if (ex.Number == 2601 || ex.Number == 2627)
+                    {
+                        // Username already exists
+                        return false;
+                    }
+
+                    throw; // rethrow anything else
+                }
+            }
         }
     }
 }
