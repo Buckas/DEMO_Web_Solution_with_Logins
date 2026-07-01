@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# --- Include the LocalDB database in the repo (added manually) ---
+!App_Data/SolutionDataBase.mdf
+!App_Data/SolutionDataBase_log.ldf
